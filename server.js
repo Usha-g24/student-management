@@ -5,7 +5,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 // Database connection
-const connectDB = require("./config/db");
+const connectDB = require("./config/db.js");
 
 // Import Routes
 const uploadRoutes = require("./routes/uploadRoutes");
