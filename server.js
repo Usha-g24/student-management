@@ -1,23 +1,27 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
-const uploadRoutes = require("./routes/uploadRoutes");
 
 dotenv.config();
+
+const uploadRoutes = require("./routes/uploadRoutes");
+const studentRoutes = require("./routes/studentRoutes");
 
 const app = express();
 
 // Middleware
 app.use(express.json());
-app.use("/api/files", uploadRoutes);
 
 // Home API
 app.get("/", (req, res) => {
   res.send("Node.js Server is Running Successfully!");
 });
 
+// Upload routes
+app.use("/api/files", uploadRoutes);
+
 // Student routes
-app.use("/api/students", require("./routes/studentRoutes"));
+app.use("/api/students", studentRoutes);
 
 // Server startup
 const PORT = process.env.PORT || 3000;

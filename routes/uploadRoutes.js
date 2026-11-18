@@ -5,7 +5,10 @@ const { randomUUID } = require("crypto");
 
 const {
   S3Client,
-  PutObjectCommand
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command
 } = require("@aws-sdk/client-s3");
 
 const router = express.Router();
@@ -38,7 +41,6 @@ const upload = multer({
 router.post("/upload", upload.single("image"), async (req, res) => {
   try {
 
-    // Check image
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -46,7 +48,6 @@ router.post("/upload", upload.single("image"), async (req, res) => {
       });
     }
 
-    // Check S3 bucket configuration
     if (!process.env.S3_BUCKET || !process.env.AWS_REGION) {
       return res.status(500).json({
         success: false,
@@ -54,11 +55,9 @@ router.post("/upload", upload.single("image"), async (req, res) => {
       });
     }
 
-    // Generate unique image name
     const extension = req.file.originalname.split(".").pop();
     const fileName = `${randomUUID()}.${extension}`;
 
-    // S3 Upload Command
     const command = new PutObjectCommand({
       Bucket: process.env.S3_BUCKET,
       Key: fileName,
@@ -66,10 +65,8 @@ router.post("/upload", upload.single("image"), async (req, res) => {
       ContentType: req.file.mimetype
     });
 
-    // Upload to AWS S3
     await s3.send(command);
 
-    // Success Response
     res.status(200).json({
       success: true,
       message: "Image uploaded successfully",
@@ -83,6 +80,104 @@ router.post("/upload", upload.single("image"), async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Image upload failed"
+    });
+  }
+});
+
+
+// GET API - Download Image from S3
+router.get("/download/:key", async (req, res) => {
+  try {
+
+    const command = new GetObjectCommand({
+      Bucket: process.env.S3_BUCKET,
+      Key: req.params.key
+    });
+
+    const result = await s3.send(command);
+
+    res.setHeader(
+      "Content-Type",
+      result.ContentType || "application/octet-stream"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${req.params.key}"`
+    );
+
+    result.Body.pipe(res);
+
+  } catch (error) {
+
+    console.error("S3 Download Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Image download failed"
+    });
+  }
+});
+
+
+// DELETE API - Delete Image from S3
+router.delete("/delete/:key", async (req, res) => {
+  try {
+
+    const command = new DeleteObjectCommand({
+      Bucket: process.env.S3_BUCKET,
+      Key: req.params.key
+    });
+
+    await s3.send(command);
+
+    res.status(200).json({
+      success: true,
+      message: "Image deleted successfully",
+      key: req.params.key
+    });
+
+  } catch (error) {
+
+    console.error("S3 Delete Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Image delete failed"
+    });
+  }
+});
+
+
+// GET API - List Images from S3
+router.get("/list", async (req, res) => {
+  try {
+
+    const command = new ListObjectsV2Command({
+      Bucket: process.env.S3_BUCKET
+    });
+
+    const result = await s3.send(command);
+
+    const files = (result.Contents || []).map(file => ({
+      key: file.Key,
+      size: file.Size,
+      lastModified: file.LastModified
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: files.length,
+      files: files
+    });
+
+  } catch (error) {
+
+    console.error("S3 List Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Unable to list S3 files"
     });
   }
 });
